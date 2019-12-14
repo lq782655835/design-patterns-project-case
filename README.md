@@ -1,6 +1,7 @@
 # JS设计模式开发实践
 
 js将函数作为一等公民，函数也是对象。所以很多经典的设计模式案例在js语言中，都是以变种的形式而存在。
+设计模式在项目中的经典实践案例可以看笔者github [JS设计模式开发实践](https://github.com/lq782655835/design-patterns-project-case)。
 
 ## 1. 单例模式
 
@@ -428,6 +429,184 @@ let proxyFactory = function(fn) {
 let proxyMult = proxyFactory(mult)
 
 proxyMult(1, 2, 3, 4) // 24
+```
+
+## 7. 命令模式
+
+从js语言看，命令模式形式上有点类似代理模式，本质上还是分离出耦合的逻辑，使得各独立对象有单一原则。
+
+``` js
+// 强耦合方式
+var MenuBar = {
+    refresh: () => console.log('refresh')
+}
+var RightContextBar = {
+    add: (val) => console.log(val, 'add'),
+    del: () => console.log('del')
+}
+
+button1.onclick= function() { MenuBar.refresh() }
+button2.onclick= function() { RightContextBar.add(val) }
+```
+
+以上弊端很明显，button1和MenuBar强耦合了,而且无法扩展，比如command之后可以undo，此时就需要一个中间类来做这部分解耦。
+以下是传统class方式解决方案：
+
+``` js
+// class 命令模式
+var setCommand = (button, command) => button.onclick = function() {
+    // 执行统一方法：execute，不用管执行方是谁
+    command.execute()
+}
+
+// 定义的Command类，隔绝了调用方和被调用方，充当了中介者
+//（解耦合，分担了部分职责）。
+class RefreshMenuBarCommand {
+    constructor(receiver) {
+        this.receiver = receiver
+    }
+    execute() {
+        this.receiver.refresh()
+    }
+}
+class AddMenuBarCommand {
+    constructor(receiver, val) {
+        this.receiver = receiver
+        this.val = val
+    }
+    execute() {
+        this.receiver.add(this.val)
+    }
+}
+setCommand(button1, new RefreshMenuBarCommand(MenuBar))
+setCommand(button2, new AddMenuBarCommand(RightContextBar, '1'))
+```
+
+对于函数是一等公民的Javascript，不需要用到多余的class类，因为函数也是一个对象类。
+
+``` js
+// js 命令模式
+var setCommand = (button, command) => button.onclick = function() {
+    command()
+}
+var RefreshMenuBarCommand = function (receiver) {
+    return function() {
+        receiver.refresh()
+    }
+}
+var AddMenuBarCommand = function (receiver, val) {
+    return function() {
+        receiver.add(val)
+    }
+}
+setCommand(button1, RefreshMenuBarCommand(MenuBar))
+setCommand(button2, AddMenuBarCommand(RightContextBar))
+```
+
+在实际生产中，我们更可能把command命令统一execute，同时利用必包，可以在中间AddMenuBarCommand对象中存储一些东西（比如做undo行为）
+
+``` js
+var setCommand = (button, command) => button.onclick = function() {
+    command.execute()
+}
+
+var AddMenuBarCommand = function (receiver, val) {
+    // you can store variables for do something in here
+    // ...
+    return {
+        execute: function() {
+            receiver.add(val)
+        }
+    }
+}
+
+setCommand(button2, AddMenuBarCommand(RightContextBar, val))
+```
+
+## 8. 组合模式
+
+组合模式主要用到聚合（可认为使用到js数组），拥有上下级关系。这模式要求有两点：1. 组合对象和叶对象操作必须具有一致性，因为执行时是深度遍历，不区分操作。 2. 对象之间不能有多重关系。比如A节点既属于B，也属于C，此时就不能使用组合模式。
+
+``` js
+class Folder {
+    constructor(name) {
+        this.name = name
+        this.files = []
+    }
+
+    add(file) {
+        this.files.push(file)
+    }
+
+    scan() {
+        console.log(name, 'scan')
+        for (let file of this.files) {
+            file.scan()
+        }
+    }
+}
+
+class File {
+    constructor(name) {
+        this.name = name
+    }
+
+    add(file) {
+        throw new Error('not add file')
+    }
+
+    scan() {
+        console.log(name, 'scan')
+    }
+}
+
+let languageFolder = new Folder('language')
+
+let jsFolder = new Folder('js')
+jsFolder.add(new File('vue'))
+jsFolder.add(new File('React'))
+
+// 对象通过add形成上下级关系
+languageFolder.add(jsFolder)
+languageFolder.add(javaFolder)
+...
+// 拥有相同的接口
+// scan执行的是深度遍历
+languageFolder.scan()
+```
+
+## 9. 模板方法模式
+
+这模式就较为简单，主要是对通用流程进行总结，然后进行占位。比如组件的生命周期。
+
+
+``` js
+class Component {
+    constructor() {
+        this.name = name
+        this.init() // 关键的流程
+    }
+
+    init() {
+        this.beforeMounted()
+        this.mounted()
+        ...
+    }
+
+    beforeMounted() {}
+    mounted() {}
+}
+
+class InstanceComponent extends Component {
+    beforeMounted() {
+        console.log('InstanceComponent beforeMounted')
+    }
+    mounted() {
+        console.log('InstanceComponent mounted')
+    }
+}
+
+new InstanceComponent('instance') // 自动初始化
 ```
 
 ## 参考文档
